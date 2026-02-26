@@ -22,6 +22,7 @@ Source: "bin\Release\net10.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignore
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
+Name: "autorun";
 
 [Icons]
 ; Creates a Start Menu shortcut. 
@@ -29,3 +30,9 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Name: "{autoprograms}\Salat Al Khayr"; Filename: "{app}\Salat-Al-Khayr.exe"
 ; Creates a Desktop shortcut.
 Name: "{autodesktop}\Salat Al Khayr"; Filename: "{app}\Salat-Al-Khayr.exe"; Tasks: desktopicon
+
+[Registry]
+; Adds the app to the Windows Startup registry key. 
+; It only applies if the user checked the "autorun" box during installation.
+; The 'uninsdeletevalue' flag ensures it is cleanly removed if the user uninstalls the app.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SalatAlKhayr"; ValueData: """{app}\Salat-Al-Khayr.exe"""; Flags: uninsdeletevalue; Tasks: autorun
