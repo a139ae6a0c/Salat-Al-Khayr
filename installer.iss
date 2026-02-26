@@ -1,7 +1,7 @@
 [Setup]
 AppName=Salat-Al-Khayr
 AppVersion=1.0
-; Default installation folder
+; The default installation folder
 DefaultDirName={autopf}\Salat Al Khayr
 ; Where the final Setup.exe will be saved
 OutputDir=Output
@@ -11,14 +11,21 @@ SolidCompression=yes
 ; Require admin rights to install into Program Files
 PrivilegesRequired=admin
 
-[Files]
-; Grab everything in your publish folder
-Source: "bin\Release\net10.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; IMPORTANT: Since you are publishing for win-x64, you need these to ensure 
+; it installs into the 64-bit "Program Files" folder, not "Program Files (x86)".
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 
-[Icons]
-; Replace 'SalatAlKhayr.exe' with the actual name of your compiled EXE
-Name: "{autoprograms}\Salat-Al-Khayr"; Filename: "{app}\SalatAlKhayr.exe"
-Name: "{autodesktop}\Salat-Al-Khayr"; Filename: "{app}\SalatAlKhayr.exe"; Tasks: desktopicon
+[Files]
+; Grabs everything in your publish folder
+Source: "bin\Release\net10.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
+
+[Icons]
+; Creates a Start Menu shortcut. 
+; Replaced the placeholder with the likely name of your executable.
+Name: "{autoprograms}\Salat Al Khayr"; Filename: "{app}\Salat-Al-Khayr.exe"
+; Creates a Desktop shortcut.
+Name: "{autodesktop}\Salat Al Khayr"; Filename: "{app}\Salat-Al-Khayr.exe"; Tasks: desktopicon
