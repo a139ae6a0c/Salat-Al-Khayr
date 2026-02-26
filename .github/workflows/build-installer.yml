@@ -29,6 +29,6 @@ jobs:
     - name: Upload Installer Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: AdhanPlayer-Windows-Installer
+        name: SalatAlKhayr-Windows-Installer
         # This matches the OutputDir from the .iss file
         path: Output/SalatAlKhayr_Setup.exe
