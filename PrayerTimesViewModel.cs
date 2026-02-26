@@ -24,7 +24,6 @@ public class PrayerTimesViewModel : BaseViewModel
     public static PrayerTimesViewModel Current { get; private set; }
     private static readonly object AudioLock = new();
 
-    // Add these class-level variables
     private static int _streamHandle = 0;
     private SyncProcedure _endTrackSync; // Prevents the AOT Garbage Collector from crashing the app
     private static readonly HttpClient _httpClient = new HttpClient();
@@ -48,8 +47,7 @@ public class PrayerTimesViewModel : BaseViewModel
             new GradientStop { Color = Color.Parse("#f9f871"), Offset = 1 }
         }
     };
-
-
+    
     private TextBlock? _cachedUpdaterBlock;
     private Border[]? _cachedBorders;
 
@@ -231,23 +229,33 @@ public class PrayerTimesViewModel : BaseViewModel
         if (currentTime.Minute == _lastCheckedMinute) return;
         _lastCheckedMinute = currentTime.Minute;
 
-        var targetPrayerTime = _prayerTimes[nextPrayerIndex].ToString("HH:mm");
         var now = currentTime.ToString("HH:mm");
-        
-        if (_lastPrayerTime != targetPrayerTime)
+        string matchedPrayerTime = null;
+        foreach (var prayer in _prayerTimes)
         {
-            _adhanPlayed = false;
+            var pTime = prayer.ToString("HH:mm");
+            if (pTime == now)
+            {
+                matchedPrayerTime = pTime;
+                break;
+            }
         }
+        
 
-        if ((targetPrayerTime == now || now == "14:44") && !_adhanPlayed)
+        if (matchedPrayerTime != null)
         {
+            if (_lastPrayerTime != matchedPrayerTime)
+            {
+                _adhanPlayed = false;
+            }
+            
             var canPlay = false;
             lock (AudioLock) 
             {
                 if (!_adhanPlayed)
                 {
                     _adhanPlayed = true;
-                    _lastPrayerTime = targetPrayerTime;
+                    _lastPrayerTime = matchedPrayerTime;
                     canPlay = true;
                 }
             }
@@ -259,10 +267,9 @@ public class PrayerTimesViewModel : BaseViewModel
         }
         
         var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
-        if ((nextPrayerTime.ToString("HH:mm") == "00:00" || _prayerTimes[4].ToString("HH:mm") == now) 
-            && _lastFetchDate != todayStr)
+        if ((now == "00:00" || _prayerTimes[4].ToString("HH:mm") == now) && _lastFetchDate != todayStr)
         {
-             await FetchPrayerTimes();
+            await FetchPrayerTimes();
         }
     }
 
