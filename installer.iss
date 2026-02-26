@@ -1,7 +1,7 @@
-﻿[Setup]
+[Setup]
 AppName=Salat-Al-Khayr
 AppVersion=1.0
-; The default installation folder (usually C:\Program Files\Salat Al Khayr)
+; Default installation folder
 DefaultDirName={autopf}\Salat Al Khayr
 ; Where the final Setup.exe will be saved
 OutputDir=Output
@@ -12,14 +12,13 @@ SolidCompression=yes
 PrivilegesRequired=admin
 
 [Files]
-; This grabs everything in your AOT publish folder (exe, dlls, and the assets folder)
+; Grab everything in your publish folder
 Source: "bin\Release\net10.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; Creates a Start Menu shortcut. 
-; IMPORTANT: Change "YourAppExecutableName.exe" to the actual name of your compiled app!
-Name: "{autoprograms}\Adhan Player"; Filename: "{app}\YourAppExecutableName.exe"
-Name: "{autodesktop}\Adhan Player"; Filename: "{app}\YourAppExecutableName.exe"; Tasks: desktopicon
+; Replace 'SalatAlKhayr.exe' with the actual name of your compiled EXE
+Name: "{autoprograms}\Salat-Al-Khayr"; Filename: "{app}\SalatAlKhayr.exe"
+Name: "{autodesktop}\Salat-Al-Khayr"; Filename: "{app}\SalatAlKhayr.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
