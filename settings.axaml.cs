@@ -19,7 +19,7 @@ public partial class settings : UserControl
         URLInput.Text = Functions.settings.Mawaqit_URL;
         VolumeSlider.Value = Functions.settings.Volume;
         
-        _assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+        _assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets");
 
         // Ensure the directory exists
         if (!Directory.Exists(_assetsFolderPath))
@@ -126,6 +126,8 @@ public partial class settings : UserControl
         // 3. Update Volume
         var newVolume = (int)VolumeSlider.Value;
         Functions.settings.UpdateVolume(newVolume);
+
+        Functions.settings.SaveConfig();
 
         // Navigate back
         MainWindow.Instance.NavigateBack();

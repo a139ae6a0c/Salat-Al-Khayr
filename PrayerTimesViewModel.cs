@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Al_Khayr_Salat.Functions;
@@ -12,29 +13,56 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
-using NAudio.Wave;
-using Newtonsoft.Json;
+using ManagedBass;
+
 using static Al_Khayr_Salat.MainWindow;
 
 namespace Al_Khayr_Salat;
 
 public class PrayerTimesViewModel : BaseViewModel
 {
-    // Replaced Mutex with a lightweight object lock
+    public static PrayerTimesViewModel Current { get; private set; }
     private static readonly object AudioLock = new();
 
-    private static IWavePlayer? _outputDevice;
-    private static AudioFileReader? _audioFile;
+    // Add these class-level variables
+    private static int _streamHandle = 0;
+    private SyncProcedure _endTrackSync; // Prevents the AOT Garbage Collector from crashing the app
+    private static readonly HttpClient _httpClient = new HttpClient();
+    
+    private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions 
+    { 
+        WriteIndented = true,
+        TypeInfoResolver = PrayerTimeJsonContext.Default 
+    };
+    
+    private static readonly ISolidColorBrush WhiteTextBrush = new SolidColorBrush(Colors.White);
+    private static readonly ISolidColorBrush BlackTextBrush = new SolidColorBrush(Colors.Black);
+    private static readonly ISolidColorBrush DefaultBackgroundBrush = new SolidColorBrush(Color.Parse("#191919"));
+    private static readonly IBrush HighlightBackgroundBrush = new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+        GradientStops = new GradientStops
+        {
+            new GradientStop { Color = Color.Parse("#f6b162"), Offset = 0 },
+            new GradientStop { Color = Color.Parse("#f9f871"), Offset = 1 }
+        }
+    };
+
+
+    private TextBlock? _cachedUpdaterBlock;
+    private Border[]? _cachedBorders;
 
     private bool _adhanPlayed;
-    private Border? _currentHighlightedBorder;
     private string _lastPrayerTime = string.Empty;
+    private string _lastFetchDate = string.Empty; // Tracks when we last fetched
     private DateTime[] _prayerTimes = new DateTime[5];
-    private string[] _prayerTimesDisplay;
 
     public int nextPrayerIndex = 5;
     public DateTime nextPrayerTime;
-    private DateTime prayerTimeReachedLastedTime;
+    
+    private int _lastCheckedMinute = -1;
+    private int _lastHighlightedIndex = -1;
 
     public ObservableCollection<prayerTime> PrayerTimes { get; }
 
@@ -48,8 +76,7 @@ public class PrayerTimesViewModel : BaseViewModel
             new("Maghrib", "00:00:00"),
             new("Isha", "00:00:00")
         };
-
-        // Fire and forget, but neatly wrapped to avoid swallowing exceptions
+        Current = this;
         _ = InitializeAsync();
     }
 
@@ -59,8 +86,6 @@ public class PrayerTimesViewModel : BaseViewModel
         {
             Functions.settings.Loader();
             await FetchPrayerTimes();
-            
-            // Start a single, unified background ticker
             StartBackgroundTicker();
         }
         catch (Exception ex)
@@ -69,54 +94,54 @@ public class PrayerTimesViewModel : BaseViewModel
         }
     }
 
-    private async Task FetchPrayerTimes()
+    public async Task FetchPrayerTimes()
     {
         try
         {
-            var cachePath = Path.Combine("assets", "prayer_times.json");
+            // Prevent duplicate fetches on the same day
+            var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+            if (_lastFetchDate == todayStr && !Functions.settings.new_URL) return;
 
-            if (File.Exists(cachePath))
+            var cachePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "prayer_times.json");
+
+            if (File.Exists(cachePath) && !Functions.settings.new_URL)
             {
                 var cachedJson = await File.ReadAllTextAsync(cachePath);
-                var cachedData = JsonConvert.DeserializeObject<PrayerTimeCache>(cachedJson);
+                var cachedData = JsonSerializer.Deserialize(cachedJson, PrayerTimeJsonContext.Default.PrayerTimeCache);
 
-                if (cachedData != null && cachedData.Date == DateTime.Today.ToString("yyyy-MM-dd"))
+                if (cachedData != null && cachedData.Date == todayStr)
                 {
                     LoadPrayerTimes(cachedData.Times);
+                    _lastFetchDate = todayStr;
                     Console.WriteLine("Loaded prayer times from cache.");
                     return;
                 }
             }
 
             var url = Functions.settings.Mawaqit_URL;
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var htmlContent = await response.Content.ReadAsStringAsync();
 
-            using (var client = new HttpClient())
-            {
-                var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                var htmlContent = await response.Content.ReadAsStringAsync();
+            var timesStartIndex = htmlContent.IndexOf("\"times\":", StringComparison.Ordinal) + 8;
+            var timesEndIndex = htmlContent.IndexOf("]", timesStartIndex, StringComparison.Ordinal) + 1;
+            var timesJson = htmlContent.Substring(timesStartIndex, timesEndIndex - timesStartIndex);
 
-                var timesStartIndex = htmlContent.IndexOf("\"times\":", StringComparison.Ordinal) + 8;
-                var timesEndIndex = htmlContent.IndexOf("]", timesStartIndex, StringComparison.Ordinal) + 1;
-                var timesJson = htmlContent.Substring(timesStartIndex, timesEndIndex - timesStartIndex);
+            var times = JsonSerializer.Deserialize(timesJson, PrayerTimeJsonContext.Default.ListString);
 
-                var times = JsonConvert.DeserializeObject<List<string>>(timesJson);
+            if (times == null || times.Count != 5)
+                throw new Exception("Failed to extract prayer times.");
 
-                if (times == null || times.Count != 5)
-                    throw new Exception("Failed to extract prayer times.");
+            var cache = new PrayerTimeCache { Date = todayStr, Times = times };
+            if (Functions.settings.new_URL) Functions.settings.new_URL = false;
 
-                var cache = new PrayerTimeCache
-                {
-                    Date = DateTime.Today.ToString("yyyy-MM-dd"),
-                    Times = times
-                };
+            // Use static JSON options
+            var json = JsonSerializer.Serialize(cache, _jsonOptions);
+            await File.WriteAllTextAsync(cachePath, json);
 
-                var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
-                await File.WriteAllTextAsync(cachePath, json);
-
-                Console.WriteLine("Fetched from web and saved to cache.");
-                LoadPrayerTimes(times);
-            }
+            _lastFetchDate = todayStr;
+            Console.WriteLine("Fetched from web and saved to cache.");
+            LoadPrayerTimes(times);
         }
         catch (Exception ex)
         {
@@ -131,32 +156,23 @@ public class PrayerTimesViewModel : BaseViewModel
             .ToList();
 
         _prayerTimes = parsedTimes.ToArray();
-
         var prayerNames = new[] { "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha" };
 
         PrayerTimes.Clear();
-
         for (var i = 0; i < prayerNames.Length; i++)
         {
-            PrayerTimes.Add(new prayerTime(
-                prayerNames[i],
-                parsedTimes[i].ToShortTimeString()
-            ));
+            PrayerTimes.Add(new prayerTime(prayerNames[i], parsedTimes[i].ToShortTimeString()));
         }
     }
 
-    // Consolidated Background Task
     private void StartBackgroundTicker()
     {
         Task.Run(async () =>
         {
-            // PeriodicTimer is more efficient than Task.Delay and prevents thread drift
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-
             while (await timer.WaitForNextTickAsync())
             {
                 var currentTime = DateTime.Now;
-                
                 await HandleCountdownUpdateAsync(currentTime);
                 await HandleAdhanCheckAsync(currentTime);
             }
@@ -165,37 +181,41 @@ public class PrayerTimesViewModel : BaseViewModel
 
     private async Task HandleCountdownUpdateAsync(DateTime currentTime)
     {
-        nextPrayerTime = _prayerTimes.FirstOrDefault(time => time > currentTime);
-        TimeSpan countdown;
-        nextPrayerIndex = 5;
+        nextPrayerIndex = -1;
+        TimeSpan countdown = TimeSpan.Zero;
 
-        if (nextPrayerTime != DateTime.MinValue)
+        for (int i = 0; i < _prayerTimes.Length; i++)
         {
-            countdown = nextPrayerTime - currentTime;
-            nextPrayerIndex = _prayerTimes
-                .Select((time, index) => new { time, index })
-                .FirstOrDefault(pair => pair.time.TimeOfDay == nextPrayerTime.TimeOfDay)?.index ?? -1;
+            if (_prayerTimes[i] > currentTime)
+            {
+                nextPrayerIndex = i;
+                countdown = _prayerTimes[i] - currentTime;
+                break;
+            }
         }
-        else
+
+        if (nextPrayerIndex == -1 && _prayerTimes.Length > 0)
         {
-            var firstPrayerTimeTomorrow = _prayerTimes.First().AddDays(1);
+            var firstPrayerTimeTomorrow = _prayerTimes[0].AddDays(1);
             countdown = firstPrayerTimeTomorrow - currentTime;
             nextPrayerIndex = 0;
         }
-
-        var timeString = $"{countdown.Hours:D2}:{countdown.Minutes:D2}:{countdown.Seconds:D2}";
+        
+        var timeString = countdown.ToString(@"hh\:mm\:ss");
 
         try
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                var updaterBlock = Instance.Find<TextBlock>("updater");
-                if (updaterBlock == null)
-                    Console.WriteLine("TextBlock 'updater' not found.");
-                else
-                    updaterBlock.Text = timeString;
+                _cachedUpdaterBlock ??= Instance.Find<TextBlock>("updater");
+                if (_cachedUpdaterBlock != null)
+                    _cachedUpdaterBlock.Text = timeString;
 
-                HighlightNextPrayerBorder(nextPrayerIndex);
+                if (nextPrayerIndex != _lastHighlightedIndex)
+                {
+                    HighlightNextPrayerBorder(nextPrayerIndex);
+                    _lastHighlightedIndex = nextPrayerIndex;
+                }
             });
         }
         catch (Exception e)
@@ -206,42 +226,41 @@ public class PrayerTimesViewModel : BaseViewModel
 
     private async Task HandleAdhanCheckAsync(DateTime currentTime)
     {
-        var adjustedIndex = nextPrayerIndex == 0 ? 4 : nextPrayerIndex - 1;
-        var currentPrayerTime = _prayerTimes[adjustedIndex].ToString("HH:mm");
+        if (_prayerTimes.Length < 5) return;
+        
+        if (currentTime.Minute == _lastCheckedMinute) return;
+        _lastCheckedMinute = currentTime.Minute;
+
+        var targetPrayerTime = _prayerTimes[nextPrayerIndex].ToString("HH:mm");
         var now = currentTime.ToString("HH:mm");
-
-        // Console.WriteLine($"{currentPrayerTime} | {now}"); // Uncomment for debugging
-
-        // Reset the flag if the prayer time has moved forward
-        if (_lastPrayerTime != currentPrayerTime)
+        
+        if (_lastPrayerTime != targetPrayerTime)
         {
             _adhanPlayed = false;
         }
 
-        if ((currentPrayerTime == now || now == "08:15") && !_adhanPlayed)
+        if ((targetPrayerTime == now || now == "14:44") && !_adhanPlayed)
         {
             var canPlay = false;
-
-            // Replaced Mutex with lightweight lock
             lock (AudioLock) 
             {
                 if (!_adhanPlayed)
                 {
                     _adhanPlayed = true;
-                    _lastPrayerTime = currentPrayerTime;
+                    _lastPrayerTime = targetPrayerTime;
                     canPlay = true;
                 }
             }
 
-            // Only trigger the audio task if we are actually allowed to play
             if (canPlay)
             {
                 _ = Task.Run(() => PlayAdhanAudio());
             }
         }
-
-        // Re-fetch prayer times at midnight or at Isha
-        if (nextPrayerTime.ToString("HH:mm") == "00:00" || _prayerTimes[4].ToString("HH:mm") == now)
+        
+        var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+        if ((nextPrayerTime.ToString("HH:mm") == "00:00" || _prayerTimes[4].ToString("HH:mm") == now) 
+            && _lastFetchDate != todayStr)
         {
              await FetchPrayerTimes();
         }
@@ -253,21 +272,36 @@ public class PrayerTimesViewModel : BaseViewModel
         {
             StopAndDispose();
 
-            var soundPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", Al_Khayr_Salat.Functions.settings.Adhan);
-            if (!File.Exists(soundPath)) return;
+            // Use AppContext.BaseDirectory for AOT reliability
+            var soundPath = Path.Combine(AppContext.BaseDirectory, "assets", Functions.settings.Adhan);
 
-            _outputDevice = new WaveOutEvent();
-            _audioFile = new AudioFileReader(soundPath);
-
-            _outputDevice.Volume = Functions.settings.Volume / 100f;
-            _outputDevice.Init(_audioFile);
-            _outputDevice.Play();
-
-            _outputDevice.PlaybackStopped += (s, e) => StopAndDispose();
+            if (!File.Exists(soundPath))
+            {
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "assets", "error.txt"), "MP3 file not found at: " + soundPath);
+                return; // Essential: exit the method to prevent crashes
+            }
+    
+            Bass.Init(-1, 44100, DeviceInitFlags.Default);
+        
+            _streamHandle = Bass.CreateStream(soundPath, 0, 0, BassFlags.Default);
+            if (_streamHandle == 0)
+            {
+                Console.WriteLine("BASS Error: " + Bass.LastError);
+                return;
+            }
+            Bass.ChannelSetAttribute(_streamHandle, ChannelAttribute.Volume, Functions.settings.Volume / 100.0);
+            _endTrackSync = new SyncProcedure((handle, channel, data, user) => 
+            {
+                StopAndDispose();
+            });
+            Bass.ChannelSetSync(_streamHandle, SyncFlags.End, 0, _endTrackSync);
+    
+            Bass.ChannelPlay(_streamHandle);
+            
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error playing audio: " + ex.Message);
+            Console.WriteLine("Error playing MP3: " + ex.Message);
             StopAndDispose();
         }
     }
@@ -276,13 +310,14 @@ public class PrayerTimesViewModel : BaseViewModel
     {
         try
         {
-            lock (AudioLock) // Also protect disposal
+            lock (AudioLock)
             {
-                _outputDevice?.Stop();
-                _audioFile?.Dispose();
-                _audioFile = null;
-                _outputDevice?.Dispose();
-                _outputDevice = null;
+                if (_streamHandle != 0)
+                {
+                    Bass.ChannelStop(_streamHandle); // Stop playing
+                    Bass.StreamFree(_streamHandle);  // Free memory
+                    _streamHandle = 0;
+                }
             }
         }
         catch (Exception ex)
@@ -293,50 +328,47 @@ public class PrayerTimesViewModel : BaseViewModel
 
     private void HighlightNextPrayerBorder(int prayerIndex)
     {
-        if (_currentHighlightedBorder != null)
-            if (_currentHighlightedBorder is Border border)
-            {
-                border.Background = new SolidColorBrush(Color.Parse("#191919"));
-                if (border.Child is Panel panel)
-                    foreach (var textBlock in panel.Children.OfType<TextBlock>())
-                        textBlock.Foreground = new SolidColorBrush(Colors.White);
-                else if (border.Child is Grid grid)
-                    foreach (var textBlock in grid.Children.OfType<TextBlock>())
-                        textBlock.Foreground = new SolidColorBrush(Colors.White);
-            }
-
-        _currentHighlightedBorder = prayerIndex switch
+        if (_cachedBorders == null)
         {
-            0 => Instance.Find<Border>("FajrBorder"),
-            1 => Instance.Find<Border>("DhuhrBorder"),
-            2 => Instance.Find<Border>("AsrBorder"),
-            3 => Instance.Find<Border>("MaghribBorder"),
-            4 => Instance.Find<Border>("IshaBorder"),
-            _ => null
-        };
-
-        if (_currentHighlightedBorder != null)
-        {
-            _currentHighlightedBorder.Background = new LinearGradientBrush
+            _cachedBorders = new[]
             {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops = new GradientStops
-                {
-                    new GradientStop { Color = Color.Parse("#f6b162"), Offset = 0 },
-                    new GradientStop { Color = Color.Parse("#f9f871"), Offset = 1 }
-                }
+                Instance.Find<Border>("FajrBorder"),
+                Instance.Find<Border>("DhuhrBorder"),
+                Instance.Find<Border>("AsrBorder"),
+                Instance.Find<Border>("MaghribBorder"),
+                Instance.Find<Border>("IshaBorder")
             };
+        }
 
-            if (_currentHighlightedBorder is Border border)
+        for (int i = 0; i < _cachedBorders.Length; i++)
+        {
+            var border = _cachedBorders[i];
+            if (border == null) continue;
+
+            if (i == prayerIndex)
             {
-                if (border.Child is Panel panel)
-                    foreach (var child in panel.Children.OfType<TextBlock>())
-                        child.Foreground = new SolidColorBrush(Colors.Black);
-                else if (border.Child is Grid grid)
-                    foreach (var textBlock in grid.Children.OfType<TextBlock>())
-                        textBlock.Foreground = new SolidColorBrush(Colors.Black);
+                border.Background = HighlightBackgroundBrush;
+                SetTextColor(border, BlackTextBrush);
             }
+            else
+            {
+                border.Background = DefaultBackgroundBrush;
+                SetTextColor(border, WhiteTextBrush);
+            }
+        }
+    }
+
+    private void SetTextColor(Border border, ISolidColorBrush brush)
+    {
+        if (border.Child is Panel panel)
+        {
+            foreach (var child in panel.Children.OfType<TextBlock>())
+                child.Foreground = brush;
+        }
+        else if (border.Child is Grid grid)
+        {
+            foreach (var textBlock in grid.Children.OfType<TextBlock>())
+                textBlock.Foreground = brush;
         }
     }
 }

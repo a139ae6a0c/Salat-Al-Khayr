@@ -16,7 +16,7 @@ internal class Program
     public static void Main(string[] args)
     {
 
-        _appMutex = new Mutex(true, "Global\\AlKhayrSalat_Unique_ID_2024", out bool createdNew);
+        _appMutex = new Mutex(true, "Global\\AlKhayr_{0d47d8d4-41fb-46af-8670-c9f153671b9f}", out bool createdNew);
 
         if (!createdNew)
         {
@@ -41,11 +41,6 @@ internal class Program
     {
         return AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .WithInterFont()
-            #if DEBUG
-            .LogToTrace();
-            #else
-            ;
-            #endif
+            .WithInterFont();
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace Al_Khayr_Salat.Functions;
 
-public class prayerTime
+public class prayerTime 
 {
     public prayerTime(string name, string time)
     {

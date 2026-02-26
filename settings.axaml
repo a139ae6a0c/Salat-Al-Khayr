@@ -23,9 +23,9 @@
         <Grid RowDefinitions="*, Auto">
             <StackPanel Grid.Row="0" Margin="10" Spacing="10">
                 <Grid ColumnDefinitions="Auto,*">
-                    <Button Name="BackButton" Content="← Back" Width="70" HorizontalAlignment="Left" />
+                    <Button Name="BackButton" Content="← Back" Width="70" HorizontalAlignment="Left" Background="DimGray" Foreground="White" />
                     <TextBlock Grid.Column="1" Text="Settings" FontSize="25" HorizontalAlignment="Center"
-                               FontWeight="Bold" Foreground="White" />
+                               FontWeight="Bold" Foreground="White"  />
                 </Grid>
 
                 <Border Background="#191919" CornerRadius="3" Padding="10">

@@ -1,25 +1,40 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework> 
         <Nullable>enable</Nullable>
-
-        <PublishAot>false</PublishAot>
+        <PublishAot>true</PublishAot>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <OptimizationPreference>Size</OptimizationPreference>
+        <StackTraceSupport>false</StackTraceSupport>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <ApplicationIcon>favicon.ico</ApplicationIcon>
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="11.0.10"/>
-        <PackageReference Include="Avalonia.Desktop" Version="11.0.10"/>
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10"/>
+        <AvaloniaResource Include="Assets\favicon.ico" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="11.3.12" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
         <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10"/>
         <AvaloniaResource Include="Assets\Fonts\*"/>
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.0.10"/>
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.12" />
         <PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.3"/>
-        <PackageReference Include="NAudio" Version="2.2.1"/>
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
+
+        <PackageReference Include="ManagedBass" Version="3.1.1" />
+        
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="bass.dll">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 </Project>

@@ -10,7 +10,7 @@ public partial class MainWindow : Window
 {
     public static TrayIcon? trayIcon;
     public static MainWindow? Instance { get; private set; }
-
+    
     public MainWindow()
     {
         InitializeComponent();
@@ -32,7 +32,7 @@ public partial class MainWindow : Window
 
     private void OnLostFocus(object? sender, EventArgs e)
     {
-        // Hide UI to stop layout/rendering cycles, saving GPU/CPU
+        
         Hide();
     }
 
@@ -47,19 +47,18 @@ public partial class MainWindow : Window
             trayIcon?.Dispose(); // Clean up icon before exiting
             Environment.Exit(0);
         };
+        var trayMenu = new NativeMenu();
+        trayMenu.Add(openItem);
+        trayMenu.Add(quitItem);
         
         // Reuse the icon to prevent multiple instances in memory
         trayIcon = new TrayIcon
         {
-            Icon = new WindowIcon("Assets/logo.ico"), 
-            ToolTipText = "Salat Time",
+            Icon = new WindowIcon("Assets/favicon.ico"),
+            ToolTipText = "Salat Al-Khayr",
             IsVisible = true, 
-            Menu = new NativeMenu
-            {
-                Items = { openItem, quitItem }
-            }
+            Menu = trayMenu
         };
-
         trayIcon.Clicked += (sender, e) => ToggleWindow();
     }
     

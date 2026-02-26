@@ -1,14 +1,25 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization; // Added for AOT Source Generation
+using System.Threading.Tasks;
 
 namespace Al_Khayr_Salat.Functions;
+
+// 1. Define the JSON Context for AOT compilation
+[JsonSerializable(typeof(Config))]
+internal partial class ConfigJsonContext : JsonSerializerContext
+{
+}
 
 public class settings
 {
     public static string Mawaqit_URL { get; set; }
     public static int Volume { get; set; }
     public static string Adhan { get; set; }
+    
+    public static bool new_URL;
 
     public static void Loader()
     {
@@ -21,12 +32,17 @@ public class settings
         SaveConfig();
     }
 
-    public static void UpdateMawaqitURL(string newUrl)
+    public static async Task UpdateMawaqitURL(string newUrl)
     {
         if (string.IsNullOrEmpty(newUrl)) throw new ArgumentException("URL cannot be null or empty.", nameof(newUrl));
-
-        Mawaqit_URL = newUrl;
-        SaveConfig();
+        if (Mawaqit_URL != newUrl)
+        {
+            new_URL = true;
+            Mawaqit_URL = newUrl;
+            // Assuming PrayerTimesViewModel is defined elsewhere
+            await PrayerTimesViewModel.Current.FetchPrayerTimes();
+            SaveConfig();
+        }
     }
     
     public static void UpdateAdhan(string newAdhan)
@@ -36,24 +52,31 @@ public class settings
         Adhan = newAdhan;
         SaveConfig();
     }
-
+    
     private static void LoadConfig()
     {
         try
         {
             var filePath = Path.Combine("assets", "config.json");
+            
+            // 2. Setup AOT-friendly options
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                TypeInfoResolver = ConfigJsonContext.Default
+            };
 
-            // Check if the config file exists
             if (!File.Exists(filePath))
             {
                 var defaultConfig = new Config
                 { 
                     Mawaqit_URL = "https://mawaqit.net/en/al-haram-makkah-saudi-arabia", 
                     Volume = 50,
-                    Adhan = "adhan.mp3" // Default Adhan file
+                    Adhan = "adhan.mp3"
                 };
                 
-                var defaultJsonContent = JsonSerializer.Serialize(defaultConfig, new JsonSerializerOptions { WriteIndented = true });
+                // 3. Serialize using the AOT options
+                var defaultJsonContent = JsonSerializer.Serialize(defaultConfig, options);
                 Directory.CreateDirectory("assets");
                 File.WriteAllText(filePath, defaultJsonContent);
                 
@@ -66,14 +89,14 @@ public class settings
             }
 
             var jsonContent = File.ReadAllText(filePath);
-            var config = JsonSerializer.Deserialize<Config>(jsonContent);
+            
+            // 4. Deserialize using the AOT context
+            var config = JsonSerializer.Deserialize(jsonContent, ConfigJsonContext.Default.Config);
 
             if (config != null && !string.IsNullOrEmpty(config.Mawaqit_URL))
             {
                 Mawaqit_URL = config.Mawaqit_URL;
                 Volume = config.Volume;
-                
-                // Set the Adhan, defaulting to "adhan.mp3" if the config file is old and doesn't have it yet
                 Adhan = string.IsNullOrEmpty(config.Adhan) ? "adhan.mp3" : config.Adhan; 
             }
             else
@@ -85,12 +108,12 @@ public class settings
         {
             Console.WriteLine($"Error loading configuration: {ex.Message}");
             Mawaqit_URL = "https://mawaqit.net/en/al-haram-makkah-saudi-arabia";
-            Volume = 50;
-            Adhan = "adhan.mp3"; // Fallback safety
+            Volume = 66;
+            Adhan = "adhan.mp3"; 
         }
     }
-
-    private static void SaveConfig()
+    
+    public static void SaveConfig()
     {
         try
         {
@@ -99,10 +122,18 @@ public class settings
             { 
                 Mawaqit_URL = Mawaqit_URL, 
                 Volume = Volume,
-                Adhan = Adhan // Add Adhan to the saved properties
+                Adhan = Adhan 
             };
             
-            var jsonContent = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            // 5. Setup AOT-friendly options for saving
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                TypeInfoResolver = ConfigJsonContext.Default
+            };
+            
+            // 6. Serialize using AOT options
+            var jsonContent = JsonSerializer.Serialize(config, options);
             File.WriteAllText(filePath, jsonContent);
         }
         catch (Exception ex)
@@ -111,3 +142,4 @@ public class settings
         }
     }
 }
+
