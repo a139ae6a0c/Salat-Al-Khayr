@@ -1,0 +1,34 @@
+name: Build AOT & Installer
+
+# This workflow runs manually when you click a button in the Actions tab
+on:
+  workflow_dispatch: 
+
+jobs:
+  build-windows:
+    # We must use windows-latest to compile Windows AOT and run Inno Setup
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Publish Native AOT
+      # This compiles the fast, standalone executable
+      run: dotnet publish -c Release -r win-x64 /p:PublishAot=true
+
+    - name: Compile Inno Setup Installer
+      # iscc is pre-installed on GitHub's windows-latest runners
+      run: iscc "installer.iss"
+
+    - name: Upload Installer Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AdhanPlayer-Windows-Installer
+        # This matches the OutputDir from the .iss file
+        path: Output/AdhanPlayerSetup.exe
