@@ -31,4 +31,4 @@ jobs:
       with:
         name: AdhanPlayer-Windows-Installer
         # This matches the OutputDir from the .iss file
-        path: Output/AdhanPlayerSetup.exe
+        path: Output/SalatAlKhayr.exe
