@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Al_Khayr_Salat.Functions;
 
-// 1. Define the JSON Context for AOT compilation
+
 [JsonSerializable(typeof(Config))]
 internal partial class ConfigJsonContext : JsonSerializerContext
 {
@@ -182,5 +182,6 @@ public class settings
         }
     }
 }
+
 
 
