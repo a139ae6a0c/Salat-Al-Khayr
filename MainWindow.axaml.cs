@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -54,7 +55,7 @@ public partial class MainWindow : Window
         // Reuse the icon to prevent multiple instances in memory
         trayIcon = new TrayIcon
         {
-            Icon = new WindowIcon("Assets/favicon.ico"),
+            Icon = new WindowIcon(Path.Combine(Functions.settings.AppDataPath, "favicon.ico")),
             ToolTipText = "Salat Al-Khayr",
             IsVisible = true, 
             Menu = trayMenu

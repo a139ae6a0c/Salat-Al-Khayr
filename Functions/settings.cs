@@ -98,6 +98,7 @@ public class settings
                 Adhan = defaultConfig.Adhan;
                 
                 var defaultAdhanDest = Path.Combine(AppDataPath, "adhan.mp3");
+                var defaultIconDest = Path.Combine(AppDataPath, "favicon.ico");
                 if (!File.Exists(defaultAdhanDest))
                 {
                     Console.WriteLine("Downloading default adhan.mp3...");
@@ -107,9 +108,15 @@ public class settings
                         {
                             using var client = new System.Net.Http.HttpClient();
                             var downloadUrl = "https://github.com/a139ae6a0c/Salat-Al-Khayr/raw/refs/heads/master/Assets/adhan.mp3";
-                            var audioBytes = await client.GetByteArrayAsync(downloadUrl);
-                            await File.WriteAllBytesAsync(defaultAdhanDest, audioBytes);
+                            var Bytes = await client.GetByteArrayAsync(downloadUrl);
+                            await File.WriteAllBytesAsync(defaultAdhanDest, Bytes);
                             Console.WriteLine("Successfully downloaded default adhan.mp3.");
+                            
+                            // Icon
+                            downloadUrl = "https://github.com/a139ae6a0c/Salat-Al-Khayr/raw/refs/heads/master/Assets/favicon.ico";
+                            Bytes = await client.GetByteArrayAsync(downloadUrl);
+                            await File.WriteAllBytesAsync(defaultIconDest, Bytes);
+                            Console.WriteLine("Successfully downloaded default ICON.");
                         }
                         catch (Exception ex)
                         {
