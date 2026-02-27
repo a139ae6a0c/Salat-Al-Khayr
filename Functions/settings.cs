@@ -90,7 +90,6 @@ public class settings
                 
                 // 3. Serialize using the AOT options
                 var defaultJsonContent = JsonSerializer.Serialize(defaultConfig, options);
-                Directory.CreateDirectory("assets");
                 File.WriteAllText(filePath, defaultJsonContent);
                 
                 Mawaqit_URL = defaultConfig.Mawaqit_URL;
@@ -183,4 +182,5 @@ public class settings
         }
     }
 }
+
 
