@@ -20,6 +20,19 @@ public class settings
     public static string Adhan { get; set; }
     
     public static bool new_URL;
+    
+    public static string AppDataPath 
+    {
+        get 
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Al_Khayr_Salat");
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+            return path;
+        }
+    }
 
     public static void Loader()
     {
@@ -57,7 +70,7 @@ public class settings
     {
         try
         {
-            var filePath = Path.Combine("assets", "config.json");
+            var filePath = Path.Combine(AppDataPath, "config.json");
             
             // 2. Setup AOT-friendly options
             var options = new JsonSerializerOptions
@@ -83,6 +96,27 @@ public class settings
                 Mawaqit_URL = defaultConfig.Mawaqit_URL;
                 Volume = defaultConfig.Volume;
                 Adhan = defaultConfig.Adhan;
+                
+                var defaultAdhanDest = Path.Combine(AppDataPath, "adhan.mp3");
+                if (!File.Exists(defaultAdhanDest))
+                {
+                    Console.WriteLine("Downloading default adhan.mp3...");
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var client = new System.Net.Http.HttpClient();
+                            var downloadUrl = "https://github.com/a139ae6a0c/Salat-Al-Khayr/raw/refs/heads/master/Assets/adhan.mp3";
+                            var audioBytes = await client.GetByteArrayAsync(downloadUrl);
+                            await File.WriteAllBytesAsync(defaultAdhanDest, audioBytes);
+                            Console.WriteLine("Successfully downloaded default adhan.mp3.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Failed to download default adhan.mp3: {ex.Message}");
+                        }
+                    }).Wait(); 
+                }
                 
                 Console.WriteLine("Config file not found. Created a new config.json with default URL and Adhan.");
                 return;
@@ -117,7 +151,7 @@ public class settings
     {
         try
         {
-            var filePath = Path.Combine("assets", "config.json");
+            var filePath = Path.Combine(AppDataPath, "config.json");
             var config = new Config 
             { 
                 Mawaqit_URL = Mawaqit_URL, 

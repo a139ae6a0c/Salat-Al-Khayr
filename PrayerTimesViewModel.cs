@@ -100,7 +100,7 @@ public class PrayerTimesViewModel : BaseViewModel
             var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
             if (_lastFetchDate == todayStr && !Functions.settings.new_URL) return;
 
-            var cachePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "prayer_times.json");
+            var cachePath = Path.Combine(Functions.settings.AppDataPath, "prayer_times.json");
 
             if (File.Exists(cachePath) && !Functions.settings.new_URL)
             {
@@ -280,8 +280,8 @@ public class PrayerTimesViewModel : BaseViewModel
             StopAndDispose();
 
             // Use AppContext.BaseDirectory for AOT reliability
-            var soundPath = Path.Combine(AppContext.BaseDirectory, "assets", Functions.settings.Adhan);
-
+            var soundPath = Path.Combine(Functions.settings.AppDataPath, Functions.settings.Adhan);
+            
             if (!File.Exists(soundPath))
             {
                 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "assets", "error.txt"), "MP3 file not found at: " + soundPath);

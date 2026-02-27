@@ -18,7 +18,7 @@ public partial class settings : UserControl
         URLInput.Text = Functions.settings.Mawaqit_URL;
         VolumeSlider.Value = Functions.settings.Volume;
         
-        _assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets");
+        _assetsFolderPath = Functions.settings.AppDataPath;
 
         if (!Directory.Exists(_assetsFolderPath))
         {
@@ -33,7 +33,7 @@ public partial class settings : UserControl
 
     private void LoadMp3Files()
     {
-        var mp3Files = Directory.GetFiles(_assetsFolderPath, "*.mp3")
+        var mp3Files = Directory.GetFiles(Functions.settings.AppDataPath, "*.mp3")
             .Select(Path.GetFileName)
             .ToList();
 
