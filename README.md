@@ -17,8 +17,8 @@
 
 ## 🛠️ Technology Stack
 
-* **Language:** C#
-* **Platform:** Windows Desktop
+* **Language:** C# AOT
+* **Platform:** Windows Desktop, Linux & IOS (Soon)
 
 ## ⚙️ Configuration & Settings
 
