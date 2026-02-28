@@ -1,6 +1,6 @@
 # Salat Al-Khayr (Alpha)
 
-![Salat Al-Khayr Logo](logo.png)
+![Salat Al-Khayr Desktop app](product.png)
 
 **Salat Al-Khayr** is a desktop prayer time application built in C#. It sits cleanly on your desktop, providing accurate prayer times, a real-time countdown to the next Salah, and automated Adhan playback. 
 
